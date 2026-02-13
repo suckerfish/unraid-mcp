@@ -1,0 +1,23 @@
+services:
+  unraid-mcp:
+    image: ghcr.io/suckerfish/unraid-mcp:latest
+    container_name: unraid-mcp
+    environment:
+      - UNRAID_API_URL=${UNRAID_API_URL}
+      - UNRAID_API_KEY=${UNRAID_API_KEY}
+      - UNRAID_MCP_PORT=${UNRAID_MCP_PORT:-6970}
+      - UNRAID_MCP_HOST=${UNRAID_MCP_HOST:-0.0.0.0}
+      - UNRAID_MCP_TRANSPORT=${UNRAID_MCP_TRANSPORT:-streamable-http}
+      - UNRAID_VERIFY_SSL=${UNRAID_VERIFY_SSL:-false}
+      - UNRAID_MCP_LOG_LEVEL=${UNRAID_MCP_LOG_LEVEL:-INFO}
+      - UNRAID_AUTO_START_SUBSCRIPTIONS=${UNRAID_AUTO_START_SUBSCRIPTIONS:-true}
+      - UNRAID_MAX_RECONNECT_ATTEMPTS=${UNRAID_MAX_RECONNECT_ATTEMPTS:-10}
+    ports:
+      - "6970:6970"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null -w '%{http_code}' http://localhost:6970/mcp | grep -q 406"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
