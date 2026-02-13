@@ -1,5 +1,7 @@
 services:
   unraid-mcp:
+    image: ghcr.io/suckerfish/unraid-mcp:latest
+    pull_policy: build
     build:
       context: .
       dockerfile: Dockerfile
