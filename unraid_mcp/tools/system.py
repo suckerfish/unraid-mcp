@@ -20,17 +20,17 @@ async def _get_system_info() -> dict[str, Any]:
     query = """
     query GetSystemInfo {
       info {
-        os { platform distro release codename kernel arch hostname codepage logofile serial build uptime }
-        cpu { manufacturer brand vendor family model stepping revision voltage speed speedmin speedmax threads cores processors socket cache flags }
+        os { platform distro release codename kernel arch hostname fqdn servicepack uefi logofile serial build uptime }
+        cpu { manufacturer brand vendor family model stepping revision threads cores processors socket cache flags }
         memory {
-          # Avoid fetching problematic fields that cause type errors
-          layout { bank type clockSpeed formFactor manufacturer partNum serialNum }
+          layout { bank type clockSpeed formFactor manufacturer partNum serialNum size }
         }
         baseboard { manufacturer model version serial assetTag }
         system { manufacturer model version serial uuid sku }
-        versions { kernel openssl systemOpenssl systemOpensslLib node v8 npm yarn pm2 gulp grunt git tsc mysql redis mongodb apache nginx php docker postfix postgresql perl python gcc unraid }
-        apps { installed started }
-        # Remove devices section as it has non-nullable fields that might be null
+        versions {
+          core { unraid api kernel }
+          packages { openssl node npm pm2 git nginx php docker }
+        }
         machineId
         time
       }
@@ -57,15 +57,24 @@ async def _get_system_info() -> dict[str, Any]:
 
         if raw_info.get('memory') and raw_info['memory'].get('layout'):
             mem_layout = raw_info['memory']['layout']
-            summary['memory_layout_details'] = []  # Renamed for clarity
-            # The API is not returning 'size' for individual sticks in the layout, even if queried.
-            # So, we cannot calculate total from layout currently.
+            summary['memory_layout_details'] = []
+            total_bytes = 0
             for stick in mem_layout:
-                # stick_size = stick.get('size') # This is None in the actual API response
+                stick_size = stick.get('size')
+                if stick_size and isinstance(stick_size, (int, float)) and stick_size > 0:
+                    total_bytes += int(stick_size)
+                size_str = ""
+                if stick_size and isinstance(stick_size, (int, float)) and stick_size > 0:
+                    size_gb = stick_size / (1024 ** 3)
+                    size_str = f", Size: {size_gb:.0f} GB"
                 summary['memory_layout_details'].append(
-                    f"Bank {stick.get('bank', '?')}: Type {stick.get('type', '?')}, Speed {stick.get('clockSpeed', '?')}MHz, Manufacturer: {stick.get('manufacturer','?')}, Part: {stick.get('partNum', '?')}"
+                    f"Bank {stick.get('bank', '?')}: Type {stick.get('type', '?')}, Speed {stick.get('clockSpeed', '?')}MHz{size_str}, Manufacturer: {stick.get('manufacturer','?')}, Part: {stick.get('partNum', '?')}"
                 )
-            summary['memory_summary'] = "Stick layout details retrieved. Overall total/used/free memory stats are unavailable due to API limitations (Int overflow or data not provided by API)."
+            if total_bytes > 0:
+                total_gb = total_bytes / (1024 ** 3)
+                summary['memory_total'] = f"{total_gb:.0f} GB"
+            else:
+                summary['memory_total'] = "Unknown"
         else:
             summary['memory_summary'] = "Memory information (layout or stats) not available or failed to retrieve."
 
