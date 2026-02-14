@@ -52,12 +52,12 @@ def register_rclone_tools(mcp: FastMCP) -> None:
             raise ToolError(f"Failed to list RClone remotes: {str(e)}") from e
 
     @mcp.tool()
-    async def get_rclone_config_form(provider_type: str | None = None) -> dict[str, Any]:
+    async def get_rclone_config_form(provider_type: str) -> dict[str, Any]:
         """
         Get RClone configuration form schema for setting up new remotes.
 
         Args:
-            provider_type: Optional provider type to get specific form (e.g., 's3', 'drive', 'dropbox')
+            provider_type: Provider type to get form for (e.g., 's3', 'drive', 'dropbox', 'ftp')
         """
         try:
             query = """
@@ -72,9 +72,7 @@ def register_rclone_tools(mcp: FastMCP) -> None:
             }
             """
 
-            variables = {}
-            if provider_type:
-                variables["formOptions"] = {"providerType": provider_type}
+            variables = {"formOptions": {"providerType": provider_type}}
 
             response_data = await make_graphql_request(query, variables)
 
