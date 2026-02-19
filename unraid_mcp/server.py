@@ -116,7 +116,8 @@ def run_server() -> None:
                 transport="streamable-http",
                 host=UNRAID_MCP_HOST,
                 port=UNRAID_MCP_PORT,
-                path="/mcp"  # Standard path for MCP
+                path="/mcp",
+                stateless_http=True,
             )
         elif UNRAID_MCP_TRANSPORT == "sse":
             # Deprecated SSE transport - log warning

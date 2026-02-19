@@ -43,19 +43,29 @@ uv run mypy unraid_mcp/
 uv run pytest
 ```
 
-### Docker Development
-```bash
-# Build the Docker image
-docker build -t unraid-mcp-server .
+### Docker
 
-# Run with Docker Compose
-docker-compose up -d
+There are two compose files:
+- `docker-compose.yml` — local builds (has `build:` context)
+- `compose.yaml` — pulls pre-built image from `ghcr.io/suckerfish/unraid-mcp:latest` (used by Komodo)
+
+Images are built and pushed to GHCR via GitHub Actions (`.github/workflows/docker.yml`) on push to `main` for `linux/amd64` and `linux/arm64`.
+
+```bash
+# Build locally
+docker build -t unraid-mcp .
+
+# Run with local build
+docker compose up -d
+
+# Run from GHCR image
+docker compose -f compose.yaml up -d
 
 # View logs
-docker-compose logs -f unraid-mcp
+docker compose logs -f unraid-mcp
 
-# Stop service
-docker-compose down
+# Stop
+docker compose down
 ```
 
 ### Environment Setup
