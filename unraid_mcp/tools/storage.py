@@ -214,61 +214,77 @@ def register_storage_tools(mcp: FastMCP) -> None:
 
     @mcp.tool()
     async def get_disk_details(disk_id: str) -> dict[str, Any]:
-        """Retrieves detailed SMART information and partition data for a specific physical disk."""
-        # Enhanced query with more comprehensive disk information
+        """Retrieves detailed information for a specific physical disk including SMART status, partitions, and hardware details."""
         query = """
         query GetDiskDetails($id: PrefixedID!) {
           disk(id: $id) {
             id
             device
+            type
             name
-            serialNum
+            vendor
             size
+            serialNum
+            firmwareRevision
+            interfaceType
+            smartStatus
             temperature
+            isSpinning
+            partitions {
+              name
+              fsType
+              size
+            }
           }
         }
         """
         variables = {"id": disk_id}
         try:
             logger.info(f"Executing get_disk_details for disk: {disk_id}")
-            response_data = await make_graphql_request(query, variables)
+            long_timeout = httpx.Timeout(10.0, read=90.0, connect=5.0)
+            response_data = await make_graphql_request(query, variables, custom_timeout=long_timeout)
             raw_disk = response_data.get("disk", {})
 
             if not raw_disk:
                 raise ToolError(f"Disk '{disk_id}' not found")
 
-            # Process disk information for human-readable output
-            def format_bytes(bytes_value: int | None) -> str:
+            def format_bytes(bytes_value: float | None) -> str:
                 if bytes_value is None:
                     return "N/A"
-                value = float(int(bytes_value))
+                value = float(bytes_value)
                 for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
                     if value < 1024.0:
                         return f"{value:.2f} {unit}"
                     value /= 1024.0
                 return f"{value:.2f} EB"
 
+            partitions = raw_disk.get('partitions', [])
+
             summary = {
                 'disk_id': raw_disk.get('id'),
                 'device': raw_disk.get('device'),
+                'type': raw_disk.get('type'),
                 'name': raw_disk.get('name'),
+                'vendor': raw_disk.get('vendor'),
                 'serial_number': raw_disk.get('serialNum'),
+                'firmware_revision': raw_disk.get('firmwareRevision'),
                 'size_formatted': format_bytes(raw_disk.get('size')),
-                'temperature': f"{raw_disk.get('temperature')}°C" if raw_disk.get('temperature') else 'N/A',
                 'interface_type': raw_disk.get('interfaceType'),
                 'smart_status': raw_disk.get('smartStatus'),
+                'temperature': f"{raw_disk.get('temperature')}°C" if raw_disk.get('temperature') is not None else 'N/A',
                 'is_spinning': raw_disk.get('isSpinning'),
-                'power_on_hours': raw_disk.get('powerOnHours'),
-                'reallocated_sectors': raw_disk.get('reallocatedSectorCount'),
-                'partition_count': len(raw_disk.get('partitions', [])),
-                'total_partition_size': format_bytes(sum(p.get('size', 0) for p in raw_disk.get('partitions', []) if p.get('size')))
+                'partition_count': len(partitions),
+                'partitions': [
+                    {
+                        'name': p.get('name'),
+                        'fs_type': p.get('fsType'),
+                        'size_formatted': format_bytes(p.get('size')),
+                    }
+                    for p in partitions
+                ],
             }
 
-            return {
-                'summary': summary,
-                'partitions': raw_disk.get('partitions', []),
-                'details': raw_disk
-            }
+            return summary
 
         except Exception as e:
             logger.error(f"Error in get_disk_details for {disk_id}: {e}", exc_info=True)
